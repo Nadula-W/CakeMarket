@@ -2,10 +2,22 @@ const mongoose = require("mongoose");
 
 const UserSchema = new mongoose.Schema({
   name: String,
-  email: { type: String, unique: true },
+
+  email: {
+    type: String,
+    unique: true,
+    required: true,
+    lowercase: true,
+    trim: true,
+  },
+
   password: String,
 
-  role: { type: String, enum: ["buyer", "baker"], default: "buyer" },
+  role: {
+    type: String,
+    enum: ["buyer", "baker", "admin"], // ✅ add admin
+    default: "buyer",
+  },
 
   bakerProfile: {
     bakeryName: String,
@@ -16,7 +28,7 @@ const UserSchema = new mongoose.Schema({
   provider: { type: String, default: "email" },
 
   isVerified: { type: Boolean, default: false },
-  isApproved: { type: Boolean, default: true }, // bakers can be false later
+  isApproved: { type: Boolean, default: true },
   verificationToken: String,
 });
 
