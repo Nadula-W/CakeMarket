@@ -10,7 +10,7 @@ const CakeSchema = new mongoose.Schema(
     district: { type: String, default: "" },
     category: {
       type: String,
-      enum: ["Wedding", "Birthday", "Cupcakes", "Vegan", "Gluten Free", "Macarons","Customize"],
+      enum: ["Wedding", "Birthday", "Cupcakes", "Vegan", "Gluten Free", "Macarons","Customized"],
       required: true,
     },
     imageUrl: { type: String, default: "" },

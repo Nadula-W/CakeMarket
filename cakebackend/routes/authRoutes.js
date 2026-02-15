@@ -13,11 +13,11 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 // helper: clean FRONTEND_URL (prevents // issues)
 const getFrontend = () => {
   const fe = (process.env.FRONTEND_URL || "").trim();
-  return fe.replace(/\/$/, ""); // remove trailing slash
+  return fe.replace(/\/$/, "");
 };
 
 /* =========================================================
-   1) EMAIL SIGNUP  (verification email is sent here ONLY)
+   1) EMAIL SIGNUP (verification email is sent here ONLY)
    ========================================================= */
 router.post("/register", async (req, res) => {
   try {
@@ -35,7 +35,7 @@ router.post("/register", async (req, res) => {
 
     const existing = await User.findOne({ email });
 
-    // ✅ If already exists but NOT verified -> resend verification (better UX)
+    // If already exists but NOT verified -> resend verification
     if (existing) {
       if (!existing.isVerified && existing.provider === "email") {
         const newToken = crypto.randomBytes(32).toString("hex");
@@ -61,11 +61,11 @@ router.post("/register", async (req, res) => {
       role: role || "buyer",
       provider: "email",
 
-      // ✅ verification ONLY at signup
+      // verification ONLY at signup
       isVerified: false,
       verificationToken: verifyToken,
 
-      // ✅ baker approval flow
+      // baker approval flow
       isApproved: role === "baker" ? false : true,
 
       bakerProfile:
@@ -86,7 +86,7 @@ router.post("/register", async (req, res) => {
 });
 
 /* =========================================================
-   2) VERIFY EMAIL  (just marks user verified)
+   2) VERIFY EMAIL
    ========================================================= */
 router.get("/verify-email", async (req, res) => {
   try {
@@ -102,7 +102,6 @@ router.get("/verify-email", async (req, res) => {
     const frontend = getFrontend();
     if (!frontend) return res.status(500).send("FRONTEND_URL missing in .env");
 
-    // ✅ redirect safely (no //)
     return res.redirect(`${frontend}/login`);
   } catch (err) {
     return res.status(500).send("Server error");
@@ -110,7 +109,7 @@ router.get("/verify-email", async (req, res) => {
 });
 
 /* =========================================================
-   3) EMAIL LOGIN  (NO verification check here)
+   3) EMAIL LOGIN
    ========================================================= */
 router.post("/login", async (req, res) => {
   try {
@@ -119,8 +118,6 @@ router.post("/login", async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ message: "Invalid credentials" });
-
-    // ✅ NO EMAIL VERIFICATION CHECK HERE (as you requested)
 
     // If user created via Google, block email login
     if (user.provider !== "email") {
@@ -143,17 +140,24 @@ router.post("/login", async (req, res) => {
       { expiresIn: "7d" }
     );
 
-    return res.json({ token, user });
+    return res.json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 });
 
 /* =========================================================
-   4) GOOGLE LOGIN / SIGNUP  (NO email verification required)
-      - New Google user must choose role
-      - Role saved in DB
-      - ✅ Link existing email-provider accounts to Google
+   4) GOOGLE LOGIN / SIGNUP
+   ✅ Only NEW google baker requires bakery details
+   ✅ Existing bakers can login without bakery details
    ========================================================= */
 router.post("/google", async (req, res) => {
   try {
@@ -170,7 +174,7 @@ router.post("/google", async (req, res) => {
 
     let user = await User.findOne({ email });
 
-    // New user must choose role
+    // New google user must choose role
     if (!user && !role) {
       return res.status(409).json({
         code: "ROLE_REQUIRED",
@@ -178,20 +182,18 @@ router.post("/google", async (req, res) => {
       });
     }
 
-    // If they choose baker, details are mandatory
-    const requireBakerDetails = (r) => {
-      if (r !== "baker") return null;
+    // ✅ ONLY NEW users choosing baker must send details
+    if (!user && role === "baker") {
       if (!bakeryName || !district || !contactNumber) {
-        return "Bakery name, district and contact number are required for bakers";
+        return res.status(400).json({
+          message:
+            "Bakery name, district and contact number are required for bakers",
+        });
       }
-      return null;
-    };
+    }
 
-    // ✅ Create new Google user
+    // ✅ Create NEW google user
     if (!user) {
-      const errMsg = requireBakerDetails(role);
-      if (errMsg) return res.status(400).json({ message: errMsg });
-
       user = await User.create({
         name,
         email,
@@ -204,38 +206,23 @@ router.post("/google", async (req, res) => {
             ? { bakeryName, district, contactNumber }
             : undefined,
       });
-    }
-
-    // ✅ If existing user has no role and role provided now
-    if (user && !user.role && role) {
-      const errMsg = requireBakerDetails(role);
-      if (errMsg) return res.status(400).json({ message: errMsg });
-
-      user.role = role;
-      user.isApproved = role === "baker" ? false : true;
+    } else {
+      // ✅ Existing user: login without forcing bakery details
       user.provider = "google";
       user.isVerified = true;
-      user.bakerProfile =
-        role === "baker"
-          ? { bakeryName, district, contactNumber }
-          : undefined;
-      await user.save();
-    }
 
-    // ✅ If existing user is baker but missing profile, force profile update (optional but useful)
-    if (user && user.role === "baker") {
-      const missing =
-        !user.bakerProfile?.bakeryName ||
-        !user.bakerProfile?.district ||
-        !user.bakerProfile?.contactNumber;
-
-      if (missing) {
-        const errMsg = requireBakerDetails("baker");
-        if (errMsg) return res.status(400).json({ message: errMsg });
-
-        user.bakerProfile = { bakeryName, district, contactNumber };
-        await user.save();
+      // If existing user has no role but role comes now (ROLE_REQUIRED flow)
+      if (!user.role && role) {
+        user.role = role;
+        user.isApproved = role === "baker" ? false : true;
       }
+
+      // Optional: if frontend sends details (like from modal), update them
+      if (role === "baker" && bakeryName && district && contactNumber) {
+        user.bakerProfile = { bakeryName, district, contactNumber };
+      }
+
+      await user.save();
     }
 
     // Baker approval pending
@@ -249,11 +236,18 @@ router.post("/google", async (req, res) => {
       { expiresIn: "7d" }
     );
 
-    return res.json({ token: jwtToken, user });
+    return res.json({
+      token: jwtToken,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
   } catch (err) {
     return res.status(500).json({ message: "Google auth failed" });
   }
 });
-
 
 module.exports = router;

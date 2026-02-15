@@ -42,6 +42,15 @@ app.get("/", (req, res) => {
 });
 
 /* ---------------- 404 HANDLER (VERY IMPORTANT) ---------------- */
+const path = require("path");
+
+// Serve uploaded files before the 404 handler
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// Return 204 for favicon requests to avoid noisy 404 logs
+app.get("/favicon.ico", (req, res) => res.sendStatus(204));
+
+/* ---------------- 404 HANDLER (VERY IMPORTANT) ---------------- */
 app.use((req, res) => {
   console.error("❌ Route not found:", req.method, req.originalUrl);
   res.status(404).json({
