@@ -35,6 +35,14 @@ exports.protect = (req, res, next) => {
   }
 };
 
+// Buyer-only access ✅ (NEW)
+exports.buyerOnly = (req, res, next) => {
+  if (!req.user?.role || req.user.role !== "buyer") {
+    return res.status(403).json({ message: "Buyers only" });
+  }
+  next();
+};
+
 // Baker-only access
 exports.bakerOnly = (req, res, next) => {
   if (!req.user?.role || req.user.role !== "baker") {

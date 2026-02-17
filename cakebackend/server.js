@@ -93,3 +93,12 @@ process.on("uncaughtException", (err) => {
   console.error("❌ Uncaught Exception:", err);
   process.exit(1);
 });
+
+const path = require("path");
+
+// Serve uploaded images
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// Orders route
+const orderRoutes = require("./routes/OrderRoutes");
+app.use("/api/orders", orderRoutes);

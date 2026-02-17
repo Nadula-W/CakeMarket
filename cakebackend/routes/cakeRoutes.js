@@ -16,7 +16,7 @@ router.post("/", protect, bakerOnly, upload.single("image"), async (req, res) =>
 
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : "";
 
-    const cake = await Cake.create({
+  const cake = await Cake.create({
       bakerId: req.user.id,
       name,
       description: description || "",
@@ -27,7 +27,9 @@ router.post("/", protect, bakerOnly, upload.single("image"), async (req, res) =>
       available: available !== undefined ? String(available) === "true" : true,
     });
 
-    res.status(201).json(cake);
+  // return populated baker info
+  await cake.populate("bakerId", "name bakerProfile");
+  res.status(201).json(cake);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -36,7 +38,9 @@ router.post("/", protect, bakerOnly, upload.single("image"), async (req, res) =>
 /* ---------------- GET MY CAKES ---------------- */
 router.get("/mine", protect, bakerOnly, async (req, res) => {
   try {
-    const cakes = await Cake.find({ bakerId: req.user.id }).sort({ createdAt: -1 });
+    const cakes = await Cake.find({ bakerId: req.user.id })
+      .sort({ createdAt: -1 })
+      .populate("bakerId", "name bakerProfile");
     res.json(cakes);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -66,8 +70,9 @@ router.put("/:id", protect, bakerOnly, upload.single("image"), async (req, res) 
         cake.imageUrl = `/uploads/${req.file.filename}`;
       }
 
-    await cake.save();
-    res.json(cake);
+  await cake.save();
+  await cake.populate("bakerId", "name bakerProfile");
+  res.json(cake);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -117,8 +122,8 @@ router.get("/browse", async (req, res) => {
     if (sort === "newest") sortObj = { createdAt: -1 };
     if (sort === "oldest") sortObj = { createdAt: 1 };
 
-    const cakes = await Cake.find(filter).sort(sortObj);
-    res.json(cakes);
+  const cakes = await Cake.find(filter).sort(sortObj).populate("bakerId", "name bakerProfile");
+  res.json(cakes);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
