@@ -1,18 +1,18 @@
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 require("dotenv").config();
 
 const connectDB = require("./config/db");
+
 const authRoutes = require("./routes/authRoutes");
 const adminRoutes = require("./routes/adminRoutes");
-
-
 const cakeRoutes = require("./routes/cakeRoutes");
+const orderRoutes = require("./routes/OrderRoutes");
 
 const app = express();
 
-// Apply CORS and JSON body parsing before mounting routes so preflight
-// and other requests receive the proper headers.
+/* ---------------- MIDDLEWARE ---------------- */
 const corsOptions = {
   origin: process.env.FRONTEND_URL || "http://localhost:3000",
   credentials: true,
@@ -20,37 +20,30 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-// Ensure preflight requests are answered with proper CORS headers
 app.options("*", cors(corsOptions));
-
 app.use(express.json());
 
-app.use("/api/cakes", cakeRoutes);
+/* ---------------- STATIC ---------------- */
+// Serve uploaded files
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// Quiet favicon
+app.get("/favicon.ico", (req, res) => res.sendStatus(204));
 
 /* ---------------- ROUTES ---------------- */
-
-// 🔐 Auth routes
-app.use("/api/auth", authRoutes);
-
-// 🛠 Admin routes
-console.log("✅ Mounting admin routes at /api/admin");
-app.use("/api/admin", adminRoutes);
-
-/* ---------------- ROOT ---------------- */
 app.get("/", (req, res) => {
   res.send("CakeMarket API running");
 });
 
-/* ---------------- 404 HANDLER (VERY IMPORTANT) ---------------- */
-const path = require("path");
+app.use("/api/cakes", cakeRoutes);
+app.use("/api/auth", authRoutes);
 
-// Serve uploaded files before the 404 handler
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+console.log("✅ Mounting admin routes at /api/admin");
+app.use("/api/admin", adminRoutes);
 
-// Return 204 for favicon requests to avoid noisy 404 logs
-app.get("/favicon.ico", (req, res) => res.sendStatus(204));
+app.use("/api/orders", orderRoutes);
 
-/* ---------------- 404 HANDLER (VERY IMPORTANT) ---------------- */
+/* ---------------- 404 HANDLER ---------------- */
 app.use((req, res) => {
   console.error("❌ Route not found:", req.method, req.originalUrl);
   res.status(404).json({
@@ -70,7 +63,6 @@ connectDB()
 
     server.on("error", (err) => {
       console.error("❌ Server failed to start:", err);
-
       if (err.code === "EADDRINUSE") {
         console.error(
           `⚠️ Port ${PORT} is already in use. Stop the process or change PORT.`
@@ -93,12 +85,3 @@ process.on("uncaughtException", (err) => {
   console.error("❌ Uncaught Exception:", err);
   process.exit(1);
 });
-
-const path = require("path");
-
-// Serve uploaded images
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
-// Orders route
-const orderRoutes = require("./routes/OrderRoutes");
-app.use("/api/orders", orderRoutes);
