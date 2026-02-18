@@ -2,14 +2,15 @@ import axios from "axios";
 
 // CRA reads env vars that start with REACT_APP_
 const BASE_URL =
-  process.env.REACT_APP_API_URL || "http://localhost:5000";
+  (process.env.REACT_APP_API_URL || "").replace(/\/$/, "") ||
+  "http://localhost:5000";
 
-// Your backend routes already start with /api, so keep /api here
 const API = axios.create({
   baseURL: `${BASE_URL}/api`,
-  // If you use cookies/sessions, keep this true.
-  // If you only use JWT in headers (like you do), it's fine either way.
-  withCredentials: true,
+  withCredentials: false, // ✅ no cookies needed since you use JWT
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
 API.interceptors.request.use((config) => {
