@@ -12,16 +12,41 @@ const orderRoutes = require("./routes/OrderRoutes");
 
 const app = express();
 
+/* ---------------- PROXY (Render) ---------------- */
+app.set("trust proxy", 1);
+
 /* ---------------- MIDDLEWARE ---------------- */
+app.use(express.json());
+
+// ✅ Allow multiple origins safely (Vercel + localhost)
+const allowedOrigins = [
+  (process.env.FRONTEND_URL || "").trim().replace(/\/$/, ""),
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+].filter(Boolean);
+
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || "http://localhost:3000",
+  origin: function (origin, callback) {
+    // allow requests with no origin (like Postman, curl)
+    if (!origin) return callback(null, true);
+
+    const cleanOrigin = origin.trim().replace(/\/$/, "");
+    if (allowedOrigins.includes(cleanOrigin)) {
+      return callback(null, true);
+    }
+
+    console.error("❌ CORS blocked origin:", origin);
+    return callback(new Error("Not allowed by CORS"), false);
+  },
   credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
 app.use(cors(corsOptions));
+
+// ✅ ensure preflight always responds
 app.options("*", cors(corsOptions));
-app.use(express.json());
 
 /* ---------------- STATIC ---------------- */
 // Serve uploaded files
